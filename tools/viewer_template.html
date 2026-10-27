@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plant explorer · vinf-plants</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,500;0,600;1,400;1,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #F4F7F2;
+  --paper-2: #FFFFFF;
+  --ink: #17261C;
+  --ink-2: #566459;
+  --moss: #2E5A3C;
+  --moss-soft: #DCE8DA;
+  --lichen: #C9D3C4;
+  --bark: #8A6A45;
+  --z1:#6B4FBB; --z2:#7A6BC9; --z3:#7C8EE0; --z4:#6FB0D9; --z5:#5FC0A6; --z6:#8FCF74;
+  --z7:#C6DA5E; --z8:#F0D452; --z9:#F2A94A; --z10:#EC7F3F; --z11:#D8583A; --z12:#B93B3B; --z13:#8F2A2A;
+  --display: "Spectral", Georgia, "Times New Roman", serif;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #121A15; --paper-2: #1A241D; --ink: #E8EEE6; --ink-2: #A3B0A6;
+    --moss: #8CC69B; --moss-soft: #243528; --lichen: #2F3D33; --bark: #C9A57E;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #121A15; --paper-2: #1A241D; --ink: #E8EEE6; --ink-2: #A3B0A6;
+  --moss: #8CC69B; --moss-soft: #243528; --lichen: #2F3D33; --bark: #C9A57E;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: var(--sans); font-size: 15px; line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--moss); }
+:focus-visible { outline: 2px solid var(--moss); outline-offset: 2px; }
+button, input, select { font: inherit; color: inherit; }
+kbd { font-family: var(--mono); font-size: 12px; border: 1px solid var(--lichen); border-radius: 4px; padding: 0 5px; color: var(--ink-2); }
+em { font-style: normal; }
+
+/* ---------- header ---------- */
+.top { padding: 28px 24px 18px; border-bottom: 1px solid var(--lichen); background: var(--paper-2); }
+.top-inner { max-width: 1240px; margin: 0 auto; display: grid; grid-template-columns: 1fr auto; gap: 8px 32px; align-items: end; }
+.eyebrow { margin: 0 0 6px; font-family: var(--mono); font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-2); }
+h1 { margin: 0; font-family: var(--display); font-weight: 500; font-size: clamp(26px, 3.2vw, 38px); line-height: 1.1; letter-spacing: -.01em; }
+h1 i { font-style: italic; color: var(--moss); }
+.lede { margin: 8px 0 0; color: var(--ink-2); }
+.lede b { color: var(--ink); font-weight: 500; font-family: var(--mono); font-size: 14px; }
+.search { grid-column: 1 / -1; position: relative; margin-top: 10px; }
+.search input {
+  width: 100%; padding: 12px 52px 12px 14px; border: 1px solid var(--lichen); border-radius: 8px;
+  background: var(--paper); font-size: 16px;
+}
+.search input::placeholder { color: var(--ink-2); }
+.search kbd { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: var(--paper-2); }
+.tools { display: flex; gap: 10px; align-items: center; justify-self: end; }
+.btn {
+  border: 1px solid var(--lichen); background: var(--paper-2); border-radius: 6px; padding: 6px 12px; cursor: pointer;
+  font-size: 14px; color: var(--ink);
+}
+.btn:hover { border-color: var(--moss); }
+
+/* ---------- layout ---------- */
+.app { max-width: 1240px; margin: 0 auto; display: grid; grid-template-columns: 290px minmax(0, 1fr); }
+.filters { border-right: 1px solid var(--lichen); padding: 18px 20px 40px; position: sticky; top: 0; max-height: 100dvh; overflow: auto; align-self: start; }
+.filters summary { display: none; }
+main { padding: 14px 24px 60px; }
+
+/* ---------- filters ---------- */
+.filters h2 { font-family: var(--mono); font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-2); font-weight: 500; margin: 20px 0 8px; }
+.filters > div > h2:first-child { margin-top: 4px; }
+fieldset { border: 0; padding: 0; margin: 0; }
+.opt { display: flex; align-items: baseline; gap: 8px; padding: 3px 0; cursor: pointer; }
+.opt input { margin: 0; accent-color: var(--moss); position: relative; top: 2px; }
+.opt span { flex: 1; }
+.opt em { font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
+.opt.zero { color: var(--ink-2); }
+details.more summary { display: list-item; cursor: pointer; font-size: 13px; color: var(--moss); padding: 3px 0; }
+.hint { font-size: 12.5px; color: var(--ink-2); margin: 6px 0 0; }
+.num { width: 100%; padding: 7px 10px; border: 1px solid var(--lichen); border-radius: 6px; background: var(--paper-2); font-family: var(--mono); }
+
+/* zone gauge doubles as the zone filter */
+.zone-gauge { display: grid; grid-template-columns: repeat(13, 1fr); gap: 2px; margin-top: 6px; }
+.zone-gauge button {
+  border: 0; padding: 0; height: 22px; border-radius: 3px; cursor: pointer; opacity: .5;
+  transition: opacity .12s;
+}
+.zone-gauge button:hover { opacity: .85; }
+.zone-gauge button.lte { opacity: 1; }
+.zone-gauge button[aria-checked="true"] { opacity: 1; outline: 2px solid var(--ink); outline-offset: 1px; }
+.zone-ticks { display: grid; grid-template-columns: repeat(13, 1fr); font-family: var(--mono); font-size: 10.5px; color: var(--ink-2); text-align: center; margin-top: 3px; }
+.zone-ticks .sk { color: var(--moss); font-weight: 500; }
+.zone-state { font-size: 13px; margin: 8px 0 0; min-height: 1.4em; }
+.zone-state b { font-family: var(--mono); font-weight: 500; }
+.link-btn { background: none; border: 0; padding: 0; color: var(--moss); cursor: pointer; text-decoration: underline; font-size: 13px; }
+
+/* ---------- results ---------- */
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 4px 0 12px; }
+.count { font-family: var(--mono); font-size: 13px; color: var(--ink-2); margin: 0; }
+.count b { color: var(--ink); font-weight: 500; }
+.bar label { font-size: 13px; color: var(--ink-2); display: flex; align-items: center; gap: 8px; }
+.bar select { padding: 5px 8px; border: 1px solid var(--lichen); border-radius: 6px; background: var(--paper-2); }
+#results { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--lichen); }
+.row { border-bottom: 1px solid var(--lichen); }
+.row button {
+  width: 100%; text-align: left; background: none; border: 0; padding: 12px 8px; cursor: pointer;
+  display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 6px 24px; align-items: center; border-radius: 6px;
+}
+.row button:hover { background: var(--moss-soft); }
+.binomial { font-family: var(--display); font-style: italic; font-size: 19px; font-weight: 500; }
+.family { font-family: var(--mono); font-size: 12px; color: var(--ink-2); margin-left: 10px; }
+.common { display: block; color: var(--ink-2); font-size: 13.5px; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meta { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
+.zones { display: grid; grid-template-columns: repeat(13, 1fr); gap: 1.5px; height: 11px; }
+.zones i { display: block; border-radius: 1.5px; background: var(--lichen); opacity: .55; }
+.zones i.on { opacity: 1; }
+.hbar { height: 4px; background: var(--lichen); border-radius: 2px; position: relative; overflow: hidden; }
+.hbar i { position: absolute; inset: 0 auto 0 0; background: var(--bark); border-radius: 2px; }
+.meta .none { color: var(--ink-2); opacity: .7; }
+/* .zones .zN must beat ".zones i" (the empty-cell colour) */
+.zones .z1, .zone-gauge .z1 {background:var(--z1)} .zones .z2, .zone-gauge .z2 {background:var(--z2)}
+.zones .z3, .zone-gauge .z3 {background:var(--z3)} .zones .z4, .zone-gauge .z4 {background:var(--z4)}
+.zones .z5, .zone-gauge .z5 {background:var(--z5)} .zones .z6, .zone-gauge .z6 {background:var(--z6)}
+.zones .z7, .zone-gauge .z7 {background:var(--z7)} .zones .z8, .zone-gauge .z8 {background:var(--z8)}
+.zones .z9, .zone-gauge .z9 {background:var(--z9)} .zones .z10, .zone-gauge .z10 {background:var(--z10)}
+.zones .z11, .zone-gauge .z11 {background:var(--z11)} .zones .z12, .zone-gauge .z12 {background:var(--z12)}
+.zones .z13, .zone-gauge .z13 {background:var(--z13)}
+.empty { padding: 48px 8px; color: var(--ink-2); text-align: center; }
+.empty p { margin: 4px 0; }
+.sentinel { list-style: none; padding: 14px 8px; text-align: center; font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
+.sentinel[hidden] { display: none; }
+
+/* ---------- detail drawer ---------- */
+dialog.detail {
+  margin: 0 0 0 auto; height: 100dvh; max-height: 100dvh; width: min(600px, 100vw);
+  border: 0; border-left: 1px solid var(--lichen); background: var(--paper-2); color: var(--ink); padding: 0;
+  box-shadow: -20px 0 60px rgba(0,0,0,.18);
+}
+dialog.detail::backdrop { background: rgba(23, 38, 28, .35); }
+dialog.detail[open] { animation: slide .18s ease-out; }
+@keyframes slide { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+.detail-head { padding: 22px 24px 16px; border-bottom: 1px solid var(--lichen); position: sticky; top: 0; background: var(--paper-2); display: grid; grid-template-columns: 1fr auto; gap: 12px; }
+.detail-head h2 { margin: 0; font-family: var(--display); font-style: italic; font-weight: 500; font-size: 28px; line-height: 1.1; }
+.detail-head .family { display: block; margin: 6px 0 0; }
+.detail-head .common { white-space: normal; margin-top: 6px; }
+.detail-body { padding: 18px 24px 40px; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin: 0 0 18px; }
+.fact { border: 1px solid var(--lichen); border-radius: 8px; padding: 10px 12px; }
+.fact small { display: block; font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-2); }
+.fact b { font-family: var(--mono); font-weight: 500; font-size: 16px; }
+.fact .zones { margin-top: 6px; }
+.links { font-size: 13.5px; margin: 0 0 18px; display: flex; gap: 14px; flex-wrap: wrap; }
+.status { font-family: var(--mono); font-size: 13px; color: var(--ink-2); padding: 12px 0; }
+.status.error { color: #B93B3B; }
+dl.attrs { margin: 0; font-size: 14px; }
+dl.attrs > div { display: grid; grid-template-columns: 170px 1fr; gap: 0 16px; padding: 8px 0; border-top: 1px solid var(--lichen); }
+dl.attrs dt { color: var(--ink-2); font-family: var(--mono); font-size: 12px; padding-top: 3px; }
+dl.attrs dd { margin: 0; }
+
+/* ---------- responsive ---------- */
+@media (max-width: 900px) {
+  .app { grid-template-columns: 1fr; }
+  .filters { position: static; max-height: none; border-right: 0; border-bottom: 1px solid var(--lichen); padding: 12px 16px; }
+  .filters summary { display: list-item; cursor: pointer; font-weight: 500; padding: 6px 0; }
+  main { padding: 10px 16px 40px; }
+  .top { padding: 20px 16px 14px; }
+  .top-inner { grid-template-columns: 1fr; }
+  .tools { justify-self: start; }
+  .row button { grid-template-columns: 1fr; gap: 8px; }
+  .common { white-space: normal; }
+  dl.attrs > div { grid-template-columns: 1fr; gap: 2px 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  dialog.detail[open] { animation: none; }
+  .zone-gauge button { transition: none; }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <div>
+      <p class="eyebrow" id="eyebrow"></p>
+      <h1>Browse the extracted <i>plants</i></h1>
+      <p class="lede" id="lede"></p>
+    </div>
+    <div class="tools">
+      <button class="btn" id="export" type="button">Download selection as TSV</button>
+    </div>
+    <div class="search">
+      <input id="q" type="search" placeholder="Latin or common name, family, genus…" autocomplete="off" aria-label="Search plants">
+      <kbd>/</kbd>
+    </div>
+  </div>
+</header>
+
+<div class="app">
+  <details class="filters" id="filters" open>
+    <summary>Filters <em id="active-count"></em></summary>
+    <div>
+      <h2>Must survive in zone</h2>
+      <div class="zone-gauge" id="zone-gauge" role="radiogroup" aria-label="USDA hardiness zone"></div>
+      <div class="zone-ticks" id="zone-ticks"></div>
+      <p class="zone-state" id="zone-state"></p>
+      <p class="hint">Slovakia is mostly zone 6 (lowlands 7a, mountains 5). A plant qualifies when its lowest zone is the same or lower.</p>
+
+      <h2>Maximum height</h2>
+      <input class="num" id="hmax" type="number" min="0" step="0.5" placeholder="metres, e.g. 10" inputmode="decimal" aria-label="Maximum height in metres">
+
+      <div id="facets"></div>
+
+      <p style="margin-top:22px"><button class="btn" id="clear" type="button">Clear all filters</button></p>
+    </div>
+  </details>
+
+  <main>
+    <div class="bar">
+      <p class="count" id="count"></p>
+      <label>Sort
+        <select id="sort">
+          <option value="name">by name A–Z</option>
+          <option value="height">tallest first</option>
+          <option value="hardy">hardiest first</option>
+          <option value="attrs">most attributes first</option>
+        </select>
+      </label>
+    </div>
+    <ul id="results"></ul>
+    <p class="sentinel" id="sentinel" hidden><button class="btn" id="more" type="button">Show more</button></p>
+    <div class="empty" id="empty" hidden>
+      <p>No plant matches all the filters at once.</p>
+      <p>Try a higher zone, a larger height, or uncheck a type.</p>
+    </div>
+  </main>
+</div>
+
+<dialog class="detail" id="detail" aria-labelledby="detail-title">
+  <div class="detail-head">
+    <div>
+      <h2 id="detail-title"></h2>
+      <span class="family" id="detail-family"></span>
+      <span class="common" id="detail-common"></span>
+    </div>
+    <div><button class="btn" id="close" type="button">Close</button></div>
+  </div>
+  <div class="detail-body" id="detail-body"></div>
+</dialog>
+
+<script type="application/json" id="plant-data">__PLANT_DATA__</script>
+<script type="application/json" id="plant-meta">__PLANT_META__</script>
+<script>
+(function () {
+  // Light records only: the full attribute sets are in chunk files, loaded on demand.
+  const data = JSON.parse(document.getElementById('plant-data').textContent);
+  const meta = JSON.parse(document.getElementById('plant-meta').textContent);
+  const FACETS = meta.facets;
+
+  const VISIBLE_OPTIONS = 7;
+  const ZONES = 13;
+  const SK_ZONE = 6;
+  const HEIGHT_SCALE_CM = 4000;
+  const PAGE = 100;            // rows rendered per batch
+  const SEARCH_DEBOUNCE_MS = 150;
+  const LOCALE = 'en-GB';
+
+  const $ = (selector) => document.querySelector(selector);
+  const fmt = (n) => n.toLocaleString(LOCALE);
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const norm = (s) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const short = (v) => v.replace(/\s*\(.*\)\s*$/, '');
+
+  data.forEach((p, i) => {
+    p._i = i;
+    p._hay = norm([p.scientific_name, p.family, p.genus, ...p.common_names, ...p.synonyms].join(' '));
+  });
+
+  const state = { q: '', zone: null, hmax: '', sort: 'name', facets: {} };
+  FACETS.forEach((f) => { state.facets[f.key] = new Set(); });
+  let current = [];   // records matching the filters, sorted
+  let shown = 0;      // how many of them are in the DOM
+
+  // ---------- header ----------
+  $('#eyebrow').textContent = `vinf-plants · ${meta.source_host} · extracted ${meta.extracted_at}`;
+  $('#lede').innerHTML = `<b>${fmt(meta.count)}</b> plants · <b>${fmt(meta.families)}</b> families · <b>${fmt(meta.genera)}</b> genera · median <b>${meta.median_attributes}</b> attributes per record`;
+
+  // ---------- filtering ----------
+  function passesFacets(p, skipKey) {
+    for (const f of FACETS) {
+      if (f.key === skipKey) continue;
+      const selected = state.facets[f.key];
+      if (!selected.size) continue;
+      const values = p.facets[f.key] || [];
+      if (!values.some((v) => selected.has(v))) return false;
+    }
+    return true;
+  }
+  function passesBase(p) {
+    if (state.q) {
+      const terms = norm(state.q).split(/\s+/).filter(Boolean);
+      if (!terms.every((t) => p._hay.includes(t))) return false;
+    }
+    if (state.zone !== null && (p.zone_min === null || p.zone_min > state.zone)) return false;
+    if (state.hmax !== '' && (p.height_max_cm === null || p.height_max_cm > Number(state.hmax) * 100)) return false;
+    return true;
+  }
+  const SORTS = {
+    name: (a, b) => a.scientific_name.localeCompare(b.scientific_name),
+    height: (a, b) => (b.height_max_cm ?? -1) - (a.height_max_cm ?? -1) || SORTS.name(a, b),
+    hardy: (a, b) => (a.zone_min ?? 99) - (b.zone_min ?? 99) || SORTS.name(a, b),
+    attrs: (a, b) => b.attr_count - a.attr_count || SORTS.name(a, b),
+  };
+
+  // ---------- rendering ----------
+  function metres(cm) {
+    return (cm / 100).toLocaleString(LOCALE, { maximumFractionDigits: cm < 1000 ? 1 : 0 });
+  }
+  function heightText(p) {
+    if (p.height_max_cm === null) return '';
+    return (p.height_min_cm === p.height_max_cm ? metres(p.height_max_cm) : `${metres(p.height_min_cm)}–${metres(p.height_max_cm)}`) + ' m';
+  }
+  function zoneCells(p) {
+    let html = '';
+    for (let z = 1; z <= ZONES; z++) {
+      const on = p.zone_min !== null && z >= p.zone_min && z <= p.zone_max;
+      html += `<i class="${on ? 'on z' + z : ''}"></i>`;
+    }
+    return html;
+  }
+  function zoneText(p) {
+    return p.zone_min === null ? '' : (p.zone_min === p.zone_max ? `${p.zone_min}` : `${p.zone_min}–${p.zone_max}`);
+  }
+  function rowHtml(p) {
+    // Square-root scale: a 1.5 m shrub still shows as a visible bar next to a 40 m tree.
+    const width = p.height_max_cm === null ? 0 : Math.min(100, Math.sqrt(p.height_max_cm / HEIGHT_SCALE_CM) * 100);
+    return `<li class="row"><button type="button" data-i="${p._i}">
+      <span><span class="binomial">${esc(p.scientific_name)}</span><span class="family">${esc(p.family)}</span>
+        <span class="common">${esc(p.common_names.join(', ')) || '&nbsp;'}</span></span>
+      <span class="meta">
+        <span class="zones" aria-hidden="true">${zoneCells(p)}</span><span>${p.zone_min === null ? '<span class="none">zone not listed</span>' : 'zone ' + zoneText(p)}</span>
+        <span class="hbar" aria-hidden="true"><i style="width:${width}%"></i></span><span>${heightText(p) || '<span class="none">height not listed</span>'}</span>
+      </span></button></li>`;
+  }
+
+  // Only PAGE rows go into the DOM at a time; the sentinel below the list
+  // appends the next batch when it scrolls into view.
+  function appendRows() {
+    const batch = current.slice(shown, shown + PAGE);
+    $('#results').insertAdjacentHTML('beforeend', batch.map(rowHtml).join(''));
+    shown += batch.length;
+    const remaining = current.length - shown;
+    $('#sentinel').hidden = remaining <= 0;
+    $('#more').textContent = `Show ${fmt(Math.min(PAGE, remaining))} more (${fmt(remaining)} left)`;
+  }
+  const sentinelObserver = new IntersectionObserver((entries) => {
+    if (entries.some((e) => e.isIntersecting) && shown < current.length) appendRows();
+  }, { rootMargin: '600px 0px' });
+  sentinelObserver.observe($('#sentinel'));
+  $('#more').addEventListener('click', appendRows);
+
+  function render() {
+    current = data.filter((p) => passesBase(p) && passesFacets(p)).sort(SORTS[state.sort]);
+    $('#count').innerHTML = `<b>${fmt(current.length)}</b> of ${fmt(data.length)} plants`;
+    $('#results').innerHTML = '';
+    shown = 0;
+    appendRows();
+    $('#empty').hidden = current.length > 0;
+    renderFacets();
+    renderZone();
+    const active = Object.values(state.facets).reduce((n, s) => n + s.size, 0) + (state.zone !== null) + (state.hmax !== '');
+    $('#active-count').textContent = active ? `(${active})` : '';
+  }
+
+  // Option counts show what the result set would be with that option added,
+  // so the counts of a facet ignore that facet's own selection.
+  const facetTotals = new Map(FACETS.map((f) => {
+    const all = new Map();
+    data.forEach((p) => (p.facets[f.key] || []).forEach((v) => all.set(v, (all.get(v) || 0) + 1)));
+    return [f.key, [...all.keys()].sort((a, b) => all.get(b) - all.get(a) || a.localeCompare(b))];
+  }));
+  function renderFacets() {
+    const html = FACETS.map((f) => {
+      const values = facetTotals.get(f.key);
+      if (!values.length) return '';
+      const base = data.filter((p) => passesBase(p) && passesFacets(p, f.key));
+      const counts = new Map();
+      base.forEach((p) => (p.facets[f.key] || []).forEach((v) => counts.set(v, (counts.get(v) || 0) + 1)));
+      const option = (v) => {
+        const n = counts.get(v) || 0;
+        const checked = state.facets[f.key].has(v);
+        return `<label class="opt${n || checked ? '' : ' zero'}" title="${esc(v)}"><input type="checkbox" data-facet="${esc(f.key)}" value="${esc(v)}"${checked ? ' checked' : ''}><span>${esc(short(v))}</span><em>${fmt(n)}</em></label>`;
+      };
+      const head = values.slice(0, VISIBLE_OPTIONS).map(option).join('');
+      const rest = values.slice(VISIBLE_OPTIONS);
+      const more = rest.length
+        ? `<details class="more"${rest.some((v) => state.facets[f.key].has(v)) ? ' open' : ''}><summary>${rest.length} more</summary>${rest.map(option).join('')}</details>`
+        : '';
+      return `<fieldset><h2>${esc(f.label)}</h2>${head}${more}</fieldset>`;
+    }).join('');
+    $('#facets').innerHTML = html;
+  }
+
+  function renderZone() {
+    const gauge = $('#zone-gauge');
+    if (!gauge.children.length) {
+      gauge.innerHTML = Array.from({ length: ZONES }, (_, i) => `<button type="button" class="z${i + 1}" role="radio" data-zone="${i + 1}" aria-label="zone ${i + 1}"></button>`).join('');
+      $('#zone-ticks').innerHTML = Array.from({ length: ZONES }, (_, i) => `<span class="${i + 1 === SK_ZONE ? 'sk' : ''}">${i + 1}</span>`).join('');
+    }
+    [...gauge.children].forEach((b) => {
+      const z = Number(b.dataset.zone);
+      b.setAttribute('aria-checked', state.zone === z ? 'true' : 'false');
+      b.classList.toggle('lte', state.zone !== null && z <= state.zone);
+    });
+    $('#zone-state').innerHTML = state.zone === null
+      ? 'No limit – click a zone.'
+      : `Hardy to zone <b>${state.zone}</b> at least · <button class="link-btn" type="button" id="zone-clear">clear</button>`;
+  }
+
+  // ---------- chunk loading (full attributes) ----------
+  const chunkCache = new Map();
+  const chunkWaiters = new Map();
+  window.__plantChunk = (number, records) => {
+    chunkCache.set(number, records);
+    (chunkWaiters.get(number) || []).forEach((waiter) => waiter.resolve(records));
+    chunkWaiters.delete(number);
+  };
+  function loadChunk(number) {
+    if (chunkCache.has(number)) return Promise.resolve(chunkCache.get(number));
+    return new Promise((resolve, reject) => {
+      const waiters = chunkWaiters.get(number) || [];
+      waiters.push({ resolve, reject });
+      chunkWaiters.set(number, waiters);
+      if (waiters.length > 1) return;  // a script tag for this chunk is already on its way
+      const script = document.createElement('script');
+      script.src = `${meta.chunks_dir}${String(number).padStart(3, '0')}.js`;
+      script.onerror = () => {
+        (chunkWaiters.get(number) || []).forEach((waiter) => waiter.reject(new Error(script.src)));
+        chunkWaiters.delete(number);
+        script.remove();
+      };
+      document.head.appendChild(script);
+    });
+  }
+  function attributesOf(p) {
+    const number = Math.floor(p._i / meta.chunk_size);
+    return loadChunk(number).then((records) => records[p._i - number * meta.chunk_size]);
+  }
+
+  // ---------- detail drawer ----------
+  const dialog = $('#detail');
+  let detailToken = 0;
+  function openDetail(p) {
+    const token = ++detailToken;
+    $('#detail-title').textContent = p.scientific_name;
+    $('#detail-family').textContent = [p.family, p.genus && p.species ? `${p.genus} ${p.species}` : ''].filter(Boolean).join(' · ');
+    $('#detail-common').textContent = p.common_names.join(', ') + (p.synonyms.length ? ` · synonyms: ${p.synonyms.join(', ')}` : '');
+    const widthText = p.width_max_cm === null ? '' : `${metres(p.width_min_cm)}–${metres(p.width_max_cm)} m`;
+    const facts = [
+      ['Height', heightText(p)], ['Width', widthText],
+      ['USDA zone', zoneText(p), `<span class="zones" aria-hidden="true">${zoneCells(p)}</span>`],
+      ['Attributes', String(p.attr_count)],
+    ].map(([label, value, extra]) => `<div class="fact"><small>${label}</small><b>${esc(value) || '—'}</b>${extra || ''}</div>`).join('');
+    const head = `
+      <div class="facts">${facts}</div>
+      <p class="links"><a href="${esc(p.url)}" target="_blank" rel="noopener">Source page ↗</a>
+        <a href="${esc(meta.raw_dir + p.file)}" target="_blank">Saved HTML</a></p>`;
+    $('#detail-body').innerHTML = head + '<p class="status">Loading attributes…</p>';
+    if (!dialog.open) dialog.showModal();
+    dialog.scrollTop = 0;
+    attributesOf(p).then((attributes) => {
+      if (token !== detailToken) return;  // another plant was opened meanwhile
+      const attrs = Object.entries(attributes)
+        .map(([k, vs]) => `<div><dt>${esc(k)}</dt><dd>${vs.map(esc).join('<br>')}</dd></div>`).join('');
+      $('#detail-body').innerHTML = head + `<dl class="attrs">${attrs}</dl>`;
+    }).catch((error) => {
+      if (token !== detailToken) return;
+      $('#detail-body').innerHTML = head + `<p class="status error">Could not load ${esc(error.message)}. Rebuild the viewer with <code>python -m tools.build_viewer</code>.</p>`;
+    });
+  }
+  $('#results').addEventListener('click', (e) => {
+    const button = e.target.closest('button[data-i]');
+    if (button) openDetail(data[Number(button.dataset.i)]);
+  });
+  $('#close').addEventListener('click', () => dialog.close());
+  dialog.addEventListener('click', (e) => { if (e.target === dialog) dialog.close(); });
+
+  // ---------- controls ----------
+  let searchTimer = null;
+  $('#q').addEventListener('input', (e) => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { state.q = e.target.value.trim(); render(); }, SEARCH_DEBOUNCE_MS);
+  });
+  $('#hmax').addEventListener('input', (e) => { state.hmax = e.target.value; render(); });
+  $('#sort').addEventListener('change', (e) => { state.sort = e.target.value; render(); });
+  $('#facets').addEventListener('change', (e) => {
+    const input = e.target;
+    if (!input.matches('input[data-facet]')) return;
+    state.facets[input.dataset.facet][input.checked ? 'add' : 'delete'](input.value);
+    render();
+  });
+  $('#zone-gauge').addEventListener('click', (e) => {
+    const button = e.target.closest('button[data-zone]');
+    if (!button) return;
+    const z = Number(button.dataset.zone);
+    state.zone = state.zone === z ? null : z;
+    render();
+  });
+  $('#zone-state').addEventListener('click', (e) => {
+    if (e.target.id === 'zone-clear') { state.zone = null; render(); }
+  });
+  $('#clear').addEventListener('click', () => {
+    state.q = ''; state.zone = null; state.hmax = '';
+    FACETS.forEach((f) => state.facets[f.key].clear());
+    $('#q').value = ''; $('#hmax').value = '';
+    render();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === '/' && !dialog.open && !/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) {
+      e.preventDefault(); $('#q').focus(); $('#q').select();
+    }
+  });
+
+  // TSV of the current result set: the key fields plus the list-level attributes.
+  $('#export').addEventListener('click', () => {
+    const columns = ['url', 'scientific_name', 'family', 'genus', 'species', 'common_names', 'synonyms',
+      'height_min_cm', 'height_max_cm', 'width_min_cm', 'width_max_cm', 'zone_min', 'zone_max', ...meta.list_fields];
+    const cell = (p, c) => {
+      const v = c in p ? p[c] : (p.facets[c] || []);
+      return (Array.isArray(v) ? v.join(' | ') : (v === null ? '' : String(v))).replace(/[\t\n]/g, ' ');
+    };
+    const tsv = [columns.join('\t'), ...current.map((p) => columns.map((c) => cell(p, c)).join('\t'))].join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['﻿' + tsv], { type: 'text/tab-separated-values;charset=utf-8' }));
+    a.download = `plants_${meta.site}_${current.length}.tsv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  // Filters collapse into a disclosure on narrow screens only.
+  const narrow = window.matchMedia('(max-width: 900px)');
+  const syncFilters = () => { $('#filters').open = !narrow.matches; };
+  narrow.addEventListener('change', syncFilters);
+  syncFilters();
+
+  render();
+})();
+</script>
+</body>
+</html>

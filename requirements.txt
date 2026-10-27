@@ -1,0 +1,3 @@
+requests>=2.31
+# optional: only for the bonus token statistic (python -m tools.stats --tokens)
+tiktoken>=0.7

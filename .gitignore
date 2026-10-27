@@ -1,0 +1,11 @@
+# crawled pages and everything derived from them (1.3 GB)
+data/
+# saved Wood Database pages are "All Rights Reserved"; their tests skip without them
+tests/fixtures/wooddb/
+__pycache__/
+*.pyc
+.venv/
+.idea/
+.vscode/
+.DS_Store
+*.zip
