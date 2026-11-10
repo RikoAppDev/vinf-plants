@@ -45,14 +45,16 @@ python -m unittest discover -s tests -t .
 Expected result in a fresh clone:
 
 ```
-Ran 242 tests in 0.2s
+Ran 434 tests in 0.4s
 
-OK (skipped=34)
+OK (skipped=38)
 ```
 
-The 34 skipped tests belong to the Wood Database extractor. Its pages are under "all rights
+34 skipped tests belong to the Wood Database extractor. Its pages are under "all rights
 reserved", so they are not in this repository; the ZIP submitted on the course wiki contains
-them, and there all 242 tests pass. One test file with the name of every test:
+them. The other 4 run the Spark jobs end to end and need PySpark and a Java that Spark supports
+(`JAVA_HOME`, see section 8); inside the course Docker image they run as well:
+`./spark_docker.sh unittest tests.test_sparkjobs_sites`. One test file with the name of every test:
 
 ```
 python -m unittest tests.test_pfaf_extractor -v
@@ -70,6 +72,10 @@ python -m unittest tests.test_pfaf_extractor -v
 | `test_normalize.py` | 8 | family name typos are fixed, different families are not merged |
 | `test_merge_entities.py` | 7 | entity key, merging through a listed synonym |
 | `test_build_viewer.py` | 6 | offline HTML viewer of the records |
+| `test_wikitext.py` | 147 | regex parser on 11 saved Wikipedia pages and small wikitext cases: taxobox and rank, synonyms with authors, IUCN, year, categories, common names, lead |
+| `test_sparkjobs_wiki.py` | 25 | page selection (records read twice at a split boundary, redirect targets) and join rules of the Wikipedia jobs |
+| `test_sparkjobs_session.py` | 3 | local and HDFS paths, an old output folder is replaced only when it holds Spark output |
+| `test_sparkjobs_sites.py` | 17 | Spark extraction and merge; 4 end-to-end tests compare them with the single-process output |
 
 ## 4. Download the index
 
@@ -170,7 +176,41 @@ terminal, and an interrupted crawl continues where it stopped.
 `python -m tools.pipeline` runs extraction, merging, index build, idf comparison and coverage
 one after another.
 
-## 8. Troubleshooting
+## 8. Spark jobs and the join with Wikipedia
+
+The jobs in `sparkjobs/` run the extraction and the entity merge of step 7 with Apache Spark
+and join the entities with the English Wikipedia dump. They run in the course Docker image
+`iisas/hadoop-spark-pig-hive:2.9.2` (Spark 2.4.3, Java 8, Python 3.6), which is how they were
+tested:
+
+```
+docker pull iisas/hadoop-spark-pig-hive:2.9.2
+./spark_docker.sh sparkjobs.extract_sites       # data/raw + data/state -> data/spark/extracted/<site>/
+./spark_docker.sh sparkjobs.merge_entities      # -> data/spark/entities/, data/spark/entities_stats.md
+./spark_docker.sh sparkjobs.compare             # Spark output vs. the files of step 7: must say "identical"
+./spark_docker.sh sparkjobs.wiki_pages          # dump -> data/spark/wikipedia/pages/, stats.json
+./spark_docker.sh sparkjobs.join_wiki           # -> data/spark/joined/entities/, join_stats.md
+```
+
+`spark_docker.sh` mounts the project folder into the container as `/vinf` and starts the job
+with `spark-submit --master local[*]`; paths like `data/...` are the files on the host. The code
+also accepts `hdfs://...` paths, but this was not tested: the container started by
+`spark_docker.sh` runs no HDFS of its own. Every job prints `--help`. A job replaces its old
+output folder only when that folder holds nothing but Spark output files (`part-*`, `_SUCCESS`),
+so a wrong `--out` stops it instead of deleting data. The image is built for amd64; on an
+ARM Mac Docker emulates it, which is slower but gives the same output.
+
+The extraction needs the crawled pages of step 7 (`data/raw/`, `data/state/`). The Wikipedia jobs
+need the dump in `data/wikipedia/` (25.8 GB, about 2 h to download):
+
+```
+curl -L -C - -o data/wikipedia/enwiki-20261001-pages-articles.xml.bz2 https://dumps.wikimedia.org/enwiki/20261001/enwiki-20261001-pages-articles.xml.bz2
+```
+
+The same jobs run without Docker on Spark 4: `pip install pyspark`, set `JAVA_HOME` to
+Java 17 or 21, and call them as `python -m sparkjobs.wiki_pages` and so on.
+
+## 9. Troubleshooting
 
 | Message | Fix |
 |---|---|
@@ -178,3 +218,5 @@ one after another.
 | `No module named 'indexer'` (or `crawler`, `extractor`) | run the command from the `vinf-plants` folder, or from anywhere as `python tools/run_module.py indexer.search "..."` |
 | `No module named 'requests'` | the virtual environment is not active; activate it or call `.venv/bin/python` (Windows `.venv\Scripts\python`) |
 | PowerShell refuses to run `Activate.ps1` | call `.venv\Scripts\python -m ...` directly without activating |
+| `Java gateway process exited` or `Module jdk.incubator.vector not found` (Spark without Docker) | `JAVA_HOME` points to a Java that Spark cannot use (for example the runtime bundled with an IDE); point it to a JDK 17 or 21 |
+| `Connection refused` to `localhost:9000` in Docker | a path was read from the image's HDFS; start the job through `spark_docker.sh`, which makes plain paths local files |

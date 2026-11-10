@@ -1,3 +1,4 @@
 # saved pages are test data: keep them byte for byte as downloaded
 tests/fixtures/**/*.html -text
 tests/fixtures/*.html -text
+tests/fixtures/**/*.xml -text

@@ -8,7 +8,6 @@ Usage:
 
 import argparse
 import random
-import re
 import sys
 import time
 from datetime import datetime, timezone
@@ -18,7 +17,7 @@ import requests
 
 from . import config
 from .frontier import Frontier
-from .links import extract_links, extract_sitemap_urls
+from .links import canonicalize, extract_links, extract_sitemap_urls
 from .robots import RobotsRules
 from .storage import Storage
 
@@ -68,12 +67,6 @@ def fetch(session, url):
             print("{} for {}, retry in {:.0f}s".format(error, url, wait), flush=True)
             time.sleep(wait)
     return response, config.MAX_RETRIES, error
-
-
-def canonicalize(site, url):
-    for pattern, replacement in site.canonical:
-        url = re.sub(pattern, replacement, url)
-    return url
 
 
 def is_challenge(response):

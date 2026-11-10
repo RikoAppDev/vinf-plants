@@ -6,7 +6,10 @@ sleeps), so the reasoning is kept next to the value.
 
 import os
 import re
-from dataclasses import dataclass
+from typing import NamedTuple
+
+# re.Pattern exists only from Python 3.7; the course Docker image runs the Spark jobs on 3.6.
+Pattern = type(re.compile(""))
 
 # Optional contact (from the environment, never hard-coded) so a site admin can reach us instead of blocking us.
 CONTACT = os.environ.get("VINF_CRAWLER_CONTACT", "").strip()
@@ -53,15 +56,14 @@ MAX_CONSECUTIVE_BLOCKS = 5
 JITTER_S = 0.5
 
 
-@dataclass(frozen=True)
-class SiteConfig:
+class SiteConfig(NamedTuple):
     name: str
     base_url: str
     sitemaps: tuple        # sitemap URLs used as seeds
     seeds: tuple           # extra start URLs
-    allow: re.Pattern      # URLs we are willing to download
-    allow_aliases: re.Pattern  # wider pattern used with --include-aliases
-    relevant: re.Pattern   # URLs that are entity (plant) pages, used in statistics
+    allow: Pattern         # URLs we are willing to download
+    allow_aliases: Pattern  # wider pattern used with --include-aliases
+    relevant: Pattern      # URLs that are entity (plant) pages, used in statistics
     delay_s: float         # minimal pause between two requests to this host
     follow_links: bool = True   # False: crawl only the sitemap URLs (entity lists are complete)
     canonical: tuple = ()       # (pattern, replacement) pairs that map duplicate URL spellings to one

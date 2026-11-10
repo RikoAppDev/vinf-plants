@@ -16,7 +16,7 @@ import sys
 from collections import Counter
 
 from crawler import config
-from crawler.crawl import canonicalize
+from crawler.links import canonicalize
 from crawler.storage import LOG_COLUMNS
 
 from .normalize import family_mapping
@@ -35,28 +35,37 @@ TSV_COLUMNS = (
 )
 
 
-def saved_pages(data_dir, site):
-    """(url, file path) of every saved relevant page, from the crawl log.
+def select_pages(site, log_lines):
+    """([(url, file name)] of every saved relevant page, number of redirect duplicates skipped).
 
-    A page that was reached through a redirect whose target was also saved is
-    skipped: it is the same document under a second URL (5 such pages on NCSU).
+    log_lines are the lines of the site's crawl_log.tsv, header first. A page that
+    was reached through a redirect whose target was also saved is skipped: it is
+    the same document under a second URL (5 such pages on NCSU).
     """
-    log_path = os.path.join(data_dir, "state", site.name, "crawl_log.tsv")
+    lines = iter(log_lines)
+    next(lines, None)
     rows = []
-    with open(log_path, encoding="utf-8") as handle:
-        next(handle, None)
-        for line in handle:
-            row = dict(zip(LOG_COLUMNS, line.rstrip("\n").split("\t")))
-            if row.get("status") == "200" and row.get("file") and site.relevant.match(row["url"]):
-                rows.append(row)
+    for line in lines:
+        row = dict(zip(LOG_COLUMNS, line.rstrip("\n").split("\t")))
+        if row.get("status") == "200" and row.get("file") and site.relevant.match(row["url"]):
+            rows.append(row)
     saved_urls = {row["url"] for row in rows}
-    skipped = 0
+    pages, skipped = [], 0
     for row in rows:
         final_url = canonicalize(site, row.get("final_url") or row["url"])
         if final_url != row["url"] and final_url in saved_urls:
             skipped += 1
             continue
-        yield row["url"], os.path.join(data_dir, "raw", site.name, row["file"])
+        pages.append((row["url"], row["file"]))
+    return pages, skipped
+
+
+def saved_pages(data_dir, site):
+    """(url, file path) of every saved relevant page, from the crawl log (see select_pages)."""
+    with open(os.path.join(data_dir, "state", site.name, "crawl_log.tsv"), encoding="utf-8") as handle:
+        pages, skipped = select_pages(site, handle)
+    for url, name in pages:
+        yield url, os.path.join(data_dir, "raw", site.name, name)
     if skipped:
         print("{}: {} redirect duplicates skipped".format(site.name, skipped))
 

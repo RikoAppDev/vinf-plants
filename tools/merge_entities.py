@@ -76,64 +76,104 @@ def load_records(extracted_dir):
     return records
 
 
-def merge(records):
-    """Returns (entities, statistics dict)."""
-    key_sources = defaultdict(lambda: defaultdict(set))  # key -> source -> urls
-    for record in records:
-        key = entity_key(record.get("scientific_name", "")) or "unparsed:" + record["url"]
-        record["_key"] = key
-        key_sources[key][record["source"]].add(record["url"])
+def record_key(record):
+    return entity_key(record.get("scientific_name", "")) or "unparsed:" + record["url"]
 
+
+def synonym_edges(record, key):
+    """(alias key, record key) for every synonym listed on the record, in the listed order."""
+    return [(entity_key(synonym), key) for synonym in record.get("synonyms") or []]
+
+
+def join_synonyms(edges, key_sources):
+    """Union-find over (alias, key) edges; returns (groups, number of merges).
+
+    key_sources maps every key that has a record to the set of its sources; an alias
+    without a record is ignored. The edges must come in the order of the records and
+    their synonyms: which of two conflicting merges wins depends on it.
+    """
     groups = UnionFind()
     root_sources = {key: set(sources) for key, sources in key_sources.items()}  # root -> sources in its group
+    merges = 0
+    for alias, key in edges:
+        if not alias or alias not in key_sources:
+            continue
+        a, b = groups.find(alias), groups.find(key)
+        # Never merge two different pages of one site.
+        if a == b or root_sources[a] & root_sources[b]:
+            continue
+        groups.union(a, b)
+        root_sources[b] |= root_sources.pop(a)
+        merges += 1
+    return groups, merges
 
-    synonym_merges = 0
-    for record in records:
-        for synonym in record.get("synonyms") or []:
-            alias = entity_key(synonym)
-            if not alias or alias not in key_sources:
-                continue
-            a, b = groups.find(alias), groups.find(record["_key"])
-            # Never merge two different pages of one site.
-            if a == b or root_sources[a] & root_sources[b]:
-                continue
-            groups.union(a, b)
-            root_sources[b] |= root_sources.pop(a)
-            synonym_merges += 1
 
-    entities = defaultdict(lambda: {"keys": set(), "names": set(), "sources": defaultdict(list)})
-    for record in records:
-        entity = entities[groups.find(record["_key"])]
-        entity["keys"].add(record["_key"])
-        entity["names"].add(record.get("scientific_name", ""))
-        entity["sources"][record["source"]].append(record["url"])
+def entity_member(record, key):
+    return key, record.get("scientific_name", ""), record["source"], record["url"]
 
-    result = []
-    for number, (root, entity) in enumerate(sorted(entities.items()), 1):
-        result.append({
-            "entity_id": number,
-            "key": root,
-            "aliases": sorted(entity["keys"] - {root}),
-            "scientific_names": sorted(entity["names"]),
-            "sources": {source: sorted(urls) for source, urls in sorted(entity["sources"].items())},
-            "n_sources": len(entity["sources"]),
-        })
 
-    documents = Counter(record["source"] for record in records)
-    by_n_sources = Counter(entity["n_sources"] for entity in result)
+def build_entity(number, root, members):
+    """Entity of one group; members are entity_member() tuples of its records, in any order."""
+    keys, names, sources = set(), set(), defaultdict(list)
+    for key, name, source, url in members:
+        keys.add(key)
+        names.add(name)
+        sources[source].append(url)
+    return {
+        "entity_id": number,
+        "key": root,
+        "aliases": sorted(keys - {root}),
+        "scientific_names": sorted(names),
+        "sources": {source: sorted(urls) for source, urls in sorted(sources.items())},
+        "n_sources": len(sources),
+    }
+
+
+def entity_profile(entity):
+    """What the statistics need of an entity: its sources and whether its name was parsed."""
+    return tuple(entity["sources"]), entity["key"].startswith("unparsed:")
+
+
+def merge_stats(documents, profiles, synonym_merges):
+    """Statistics from the record counts per source and a Counter of entity profiles."""
     sources = sorted(documents)
-    pairs = {(a, b): sum(1 for e in result if a in e["sources"] and b in e["sources"])
-             for a, b in combinations(sources, 2)}
-    stats = {
+    by_n_sources = Counter()
+    for (entity_sources, _unparsed), count in profiles.items():
+        by_n_sources[len(entity_sources)] += count
+
+    def entities_with(*wanted):
+        return sum(count for (entity_sources, _unparsed), count in profiles.items()
+                   if all(source in entity_sources for source in wanted))
+
+    return {
         "documents": dict(documents),
-        "entities_per_source": {s: sum(1 for e in result if s in e["sources"]) for s in sources},
-        "entities": len(result),
-        "unparsed_names": sum(1 for e in result if e["key"].startswith("unparsed:")),
+        "entities_per_source": {s: entities_with(s) for s in sources},
+        "entities": sum(profiles.values()),
+        "unparsed_names": sum(count for (_sources, unparsed), count in profiles.items() if unparsed),
         "synonym_merges": synonym_merges,
         "by_n_sources": dict(sorted(by_n_sources.items())),
-        "pairs": {"{} & {}".format(a, b): n for (a, b), n in pairs.items()},
+        "pairs": {"{} & {}".format(a, b): entities_with(a, b) for a, b in combinations(sources, 2)},
     }
-    return result, stats
+
+
+def merge(records):
+    """Returns (entities, statistics dict)."""
+    key_sources = defaultdict(set)
+    for record in records:
+        record["_key"] = record_key(record)
+        key_sources[record["_key"]].add(record["source"])
+
+    edges = [edge for record in records for edge in synonym_edges(record, record["_key"])]
+    groups, synonym_merges = join_synonyms(edges, key_sources)
+
+    members = defaultdict(list)
+    for record in records:
+        members[groups.find(record["_key"])].append(entity_member(record, record["_key"]))
+    result = [build_entity(number, root, members[root]) for number, root in enumerate(sorted(members), 1)]
+
+    documents = Counter(record["source"] for record in records)
+    profiles = Counter(entity_profile(entity) for entity in result)
+    return result, merge_stats(documents, profiles, synonym_merges)
 
 
 def stats_markdown(stats):

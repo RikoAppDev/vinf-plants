@@ -5,12 +5,13 @@ Information Retrieval (VINF) at FIIT STU, 2026/27.
 
 The project crawls plant pages from four botanical websites, extracts plant records with
 regular expressions, merges records of the same plant from different sites and searches them
-with its own inverted index. A later part joins the data with English Wikipedia (Spark) and
-moves the index to PyLucene.
+with its own inverted index. The extraction and the merge also run on Apache Spark, which joins
+the plants with the English Wikipedia dump. A later part moves the index to PyLucene.
 
-Only `requests` and the Python standard library are used. There is no database, no pandas,
-no NLTK, no XPath or DOM-based extraction, no crawling framework and no search library.
-`tiktoken` is optional and only used for a token count.
+The crawler, extractors and index use only `requests` and the Python standard library; the
+Spark jobs use PySpark. There is no database, no pandas, no NLTK, no XPath or DOM-based
+extraction (also not for Wikipedia), no crawling framework and no search library. `tiktoken` is
+optional and only used for a token count.
 
 ## Sources
 
@@ -60,6 +61,17 @@ python -m unittest discover -s tests -t .
 
 `tools/run_module.py` runs any of these modules from another working directory, for example
 from an IDE run configuration.
+
+Spark jobs, in the course Docker image `iisas/hadoop-spark-pig-hive:2.9.2` (see
+[MANUAL.md](MANUAL.md), section 8):
+
+```
+./spark_docker.sh sparkjobs.extract_sites            # extraction on Spark
+./spark_docker.sh sparkjobs.merge_entities           # entity merge on Spark
+./spark_docker.sh sparkjobs.compare                  # both equal the single-process output
+./spark_docker.sh sparkjobs.wiki_pages               # plant pages out of the Wikipedia dump
+./spark_docker.sh sparkjobs.join_wiki                # entities joined with Wikipedia
+```
 
 ## Crawler
 
@@ -134,13 +146,50 @@ about 6 s; a query takes a few milliseconds. The built index is attached to the
 [v1.0 release](https://github.com/RikoAppDev/vinf-plants/releases/tag/v1.0), so search runs
 without a crawl (see [MANUAL.md](MANUAL.md)).
 
+## Spark and Wikipedia
+
+All Spark jobs run with `spark-submit` in the course image `iisas/hadoop-spark-pig-hive:2.9.2`
+(Spark 2.4.3, Java 8, Python 3.6) through `spark_docker.sh`, and also on Spark 4.
+
+* `extract_sites` and `merge_entities` run the extractors and the merge of the first part in the
+  executors (only the union-find over the 966 synonym edges runs on the driver). `compare`
+  checks that the 18 125 records and 14 199 entities equal the single-process output, line by line.
+* `wiki_pages` reads the dump `enwiki-20261001-pages-articles.xml.bz2` (25.8 GB) with
+  `</page>` as the record delimiter of Hadoop's `TextInputFormat`, so every record is one page;
+  bzip2 is splittable, so the file is read in 769 parallel input splits of 32 MB. Hadoop 2.9 in
+  the course image reads a record twice when a split ends inside the delimiter (HADOOP-18321);
+  the job counts such a record once and keeps every page once. Each page goes through the regex parser `wikipedia/wikitext.py` (title, redirect,
+  taxobox with genus, species, authority, IUCN status and synonyms, categories, common names,
+  lead). Of 25.9 M pages (7.2 M articles, 12.1 M redirects, 501 310 articles with a taxobox) it
+  keeps 51 091 articles and 4 088 redirects that can belong to our plants, including the plant
+  articles in other genera that a redirect from one of our names leads to.
+* `join_wiki` joins entities and pages on the entity key of the merge. An entity is looked up by
+  its own name and aliases, then by the species of a cultivar, then by its genus; a page is found
+  by the Latin name in its taxobox, its title, a redirect, the name without the hybrid sign,
+  another ending of the epithet, or a taxobox synonym of the same genus and author. The genus
+  fallback lands only on an article about a plant genus, and a species name that leads to a
+  genus or section article counts as that fallback.
+
+| Joined to | Entities |
+|---|---|
+| an article about the plant or its species | 10 042 (70.7 %) |
+| the genus article, for entities that are a genus | 314 (2.2 %) |
+| only the genus article (fallback) | 3 781 (26.6 %) |
+| nothing | 62 (0.4 %) |
+
+9 777 distinct Wikipedia articles are joined, 8 746 of them about a plant or its species. Of the
+entities joined to such an article, 99.9 % get an authority, 61.5 % the year of description,
+31.6 % an IUCN status, 63.0 % synonyms and 83.2 % common names. In the course image the page
+selection takes 13 min, the join 17 s.
+
 ## Tests
 
 `python -m unittest discover -s tests -t .` runs the unit tests: extractors on saved real
 pages with values checked by hand (`tests/fixtures/`, see its README for sources and licences),
 the crawler with a fake HTTP session, name normalisation, record merging and the indexer,
-including scores computed by hand. There are 242 tests; the Wood Database pages are not
-distributed, so 34 of their tests are skipped in a fresh clone.
+including scores computed by hand, the Wikipedia parser on saved dump pages and the Spark jobs.
+There are 434 tests; in a fresh clone 34 Wood Database tests are skipped (the pages are not
+distributed) and 4 Spark end-to-end tests are skipped unless PySpark and Java are available.
 
 ## Layout
 
@@ -150,6 +199,9 @@ distributed, so 34 of their tests are skipped in a fresh clone.
 | `extractor/` | `ncsu.py`, `pfaf.py`, `tso.py`, `wooddb.py`, `normalize.py`, `run.py` |
 | `indexer/` | `tokenize.py`, `build.py`, `search.py`, `weighting.py`, `compare.py`, `stopwords_en.txt` |
 | `tools/` | statistics, field coverage, record merging, offline HTML viewer of the records |
+| `sparkjobs/` | Spark jobs: `extract_sites.py`, `merge_entities.py`, `compare.py`, `wiki_pages.py`, `join_wiki.py`, shared `session.py` |
+| `wikipedia/` | `wikitext.py`, regex parser of one page of the Wikipedia dump |
+| `spark_docker.sh` | runs a Spark job with `spark-submit` in the course Docker image |
 | `tests/` | unit tests and saved test pages |
 | `docs/` | architecture diagram |
 | `data/` | crawled pages, crawl state, records and index (created by the commands above, not in git) |

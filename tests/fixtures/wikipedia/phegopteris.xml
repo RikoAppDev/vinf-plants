@@ -1,0 +1,77 @@
+<page>
+    <title>Phegopteris</title>
+    <ns>0</ns>
+    <id>75284</id>
+    <revision>
+      <id>1334239942</id>
+      <parentid>1297546507</parentid>
+      <timestamp>2026-01-22T10:24:26Z</timestamp>
+      <contributor>
+        <username>InternetArchiveBot</username>
+        <id>27015025</id>
+      </contributor>
+      <comment>Rescuing 1 sources and tagging 0 as dead.) #IABot (v2.0.9.5</comment>
+      <origin>1334239942</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="3574" sha1="fp8sqppm45082wbfeuzoxxt3cvlh8j4" xml:space="preserve">{{Short description|Genus of ferns}}
+{{Automatic taxobox
+| name = Beech ferns
+| image = Phegopteris_hexagonoptera1.JPG
+| image_caption = ''[[Phegopteris hexagonoptera]]'' in spring
+| taxon = Phegopteris
+| authority =  (C.Presl) Fée&lt;ref name=POWO_30000947-2/&gt;
+| subdivision_ranks = Species
+| subdivision = [[#Species|See text]].
+| synonyms = 
+  {{Genus list
+  |Lastrella|(H.Itô) Nakai
+  |Thelypteris subg. Phegopteris|(C.Presl) Ching
+  }}
+| synonyms_ref = &lt;ref name=POWO_30000947-2/&gt;&lt;ref name=CFLW/&gt;
+}}
+
+'''''Phegopteris''''' is a [[genus]] of [[fern]]s in the family [[Thelypteridaceae]], subfamily Phegopteridoideae, in the [[Pteridophyte Phylogeny Group]] classification of 2016 (PPG I).&lt;ref name=PPGI/&gt; They are known collectively as the '''beech ferns'''. Species are native to Asia, North America and Europe.&lt;ref name=CFLW/&gt;
+
+==Taxonomy==
+''Phegopteris'' was first described in 1852 by [[Carl Borivoj Presl]] as an unranked taxon within the genus ''[[Polypodium]]''. It was raised to the rank of genus by [[Antoine Laurent Apollinaire Fée|Antoine Fée]] in the same year.&lt;ref name=&quot;IPNI_30000947-2&quot;&gt;{{citation |title=''Phegopteris'' (C.Presl) Fée |work=[[International Plant Names Index|The International Plant Names Index]] |url=https://www.ipni.org/n/30000947-2 |access-date=2020-01-11 }}&lt;/ref&gt;
+
+The [[Pteridophyte Phylogeny Group]] classification of 2016 (PPG I) recognizes three genera in the subfamily Phegopteridoideae: ''[[Macrothelypteris]]'', ''Phegopteris'' and ''[[Pseudophegopteris]]''.&lt;ref name=PPGI/&gt; {{As of|2020|January}}, both the ''Checklist of Ferns and Lycophytes of the World'' and ''[[Plants of the World Online]]'' regarded ''Pseudophegopteris'' as a synonym of ''Phegopteris''.&lt;ref name=CFLW/&gt;&lt;ref name=POWO_30000947-2/&gt;
+
+===Species===
+{{As of|2025|June}}, the ''Checklist of Ferns and Lycophytes of the World'' accepted the following species:&lt;ref name=CFLW/&gt;
+{{Div col|colwidth=24em}}
+*''[[Phegopteris connectilis]]'' &lt;small&gt;(Michx.) Watt&lt;/small&gt;
+*''[[Phegopteris decursive-pinnata]]'' &lt;small&gt;(H.C.Hall) Fée&lt;/small&gt;
+*''[[Phegopteris excelsior]]'' &lt;small&gt;N.R.Patel &amp; A.V.Gilman&lt;/small&gt;
+*''[[Phegopteris hexagonoptera]]'' &lt;small&gt;(Michx.) Fée&lt;/small&gt;
+*''[[Phegopteris koreana]]'' &lt;small&gt;B.Y.Sun &amp; C.H.Kim&lt;/small&gt;
+*''[[Phegopteris taiwaniana]]'' &lt;small&gt;T.Fujiw., Ogiso &amp; Seriz.&lt;/small&gt;
+{{Div col end}}
+
+''[[Plants of the World Online]]'' listed further species which the ''Checklist of Ferns and Lycophytes of the World'' treats in ''[[Pseudophegopteris]]''&lt;ref name=POWO_30000947-2/&gt;&lt;ref name=CFLW/&gt;
+
+==References==
+{{Reflist|refs=
+&lt;ref name=CFLW&gt;{{cite WF |taxon=Phegopteris |access-date=2024-06-25}}&lt;/ref&gt;
+
+&lt;ref name=POWO_30000947-2&gt;{{Citation |title=''Phegopteris'' (C.Presl) Fée |work=Plants of the World Online |publisher=Royal Botanic Gardens, Kew|url=https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:30000947-2 |access-date=2020-01-10 }}&lt;/ref&gt;
+
+&lt;ref name=PPGI&gt;{{Citation |author=PPG I |year=2016 |title=A community-derived classification for extant lycophytes and ferns |journal=Journal of Systematics and Evolution |volume=54 |issue=6 |pages=563–603 |doi=10.1111/jse.12229|s2cid=39980610 |doi-access=free |bibcode=2016JSyEv..54..563. }}&lt;/ref&gt;
+}}
+
+==External links==
+* http://www.borealforest.org/ferns/fern16.htm {{Webarchive|url=https://web.archive.org/web/20070105162431/http://www.borealforest.org/ferns/fern16.htm |date=2007-01-05 }}
+
+{{Taxonbar|from1=Q2698282|from2=Q17335672}}
+{{Authority control}}
+
+[[Category:Thelypteridaceae]]
+[[Category:Fern genera]]
+[[Category:Taxa described in 1852]]
+
+
+{{Polypodiales-stub}}</text>
+      <sha1>fp8sqppm45082wbfeuzoxxt3cvlh8j4</sha1>
+    </revision>
+  </page>

@@ -28,6 +28,13 @@ def normalize_url(raw_url, base_url):
     return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), parts.path or "/", parts.query, ""))
 
 
+def canonicalize(site, url):
+    """One spelling of a URL that the site writes in several ways (rules in SiteConfig.canonical)."""
+    for pattern, replacement in site.canonical:
+        url = re.sub(pattern, replacement, url)
+    return url
+
+
 def extract_links(page_html, base_url):
     """All distinct absolute URLs found in <a href> attributes, in page order."""
     found = []
