@@ -24,11 +24,16 @@ def main(argv=None):
     parser.add_argument("--tokens", action="store_true", help="also count tiktoken tokens (slow)")
     args = parser.parse_args(argv)
 
+    crawled = [name for name in sorted(config.SITES)
+               if os.path.exists(os.path.join(args.data_dir, "state", name, "crawl_log.tsv"))]
+    if not crawled:
+        print("no crawl logs in {} (run python -m crawler.crawl --site ncsu)".format(
+            os.path.join(args.data_dir, "state")), file=sys.stderr)
+        return 2
+
     out_dir = os.path.join(args.data_dir, "stats")
     os.makedirs(out_dir, exist_ok=True)
-    for name in sorted(config.SITES):
-        if not os.path.exists(os.path.join(args.data_dir, "state", name, "crawl_log.tsv")):
-            continue
+    for name in crawled:
         buffer = io.StringIO()
         with contextlib.redirect_stdout(buffer):
             stats.main(["--site", name, "--data-dir", args.data_dir] + (["--tokens"] if args.tokens else []))

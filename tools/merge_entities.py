@@ -196,6 +196,10 @@ def main(argv=None):
     parser.add_argument("--data-dir", default="data")
     args = parser.parse_args(argv)
     extracted_dir = os.path.join(args.data_dir, "extracted")
+    if not glob.glob(os.path.join(extracted_dir, "*_plants.jsonl")):
+        print("no extracted records in {} (run python -m extractor.run --site all)".format(
+            os.path.join(extracted_dir, "<site>_plants.jsonl")), file=sys.stderr)
+        return 2
     entities, stats = merge(load_records(extracted_dir))
     with open(os.path.join(extracted_dir, "entities.jsonl"), "w", encoding="utf-8") as handle:
         for entity in entities:

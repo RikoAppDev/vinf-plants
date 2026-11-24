@@ -1,8 +1,10 @@
 # Manual
 
-How to install the project, run the tests and search the plants. Searching does not need a
-crawl: the index of all 18 125 plant records is attached to the
-[GitHub release](https://github.com/RikoAppDev/vinf-plants/releases/tag/v1.0).
+How to install the project, run the tests and search the plants. Searching with the own index
+(sections 4–6) does not need a crawl: the index of all 18 125 plant records is attached to the
+[GitHub release](https://github.com/RikoAppDev/vinf-plants/releases/tag/v1.0). The Spark jobs and
+the PyLucene index (sections 8 and 9) need the crawled pages and the Wikipedia dump, which are
+not distributed; without them only their unit tests run.
 
 ## 1. Requirements
 
@@ -45,16 +47,19 @@ python -m unittest discover -s tests -t .
 Expected result in a fresh clone:
 
 ```
-Ran 434 tests in 0.4s
+Ran 611 tests in 0.3s
 
-OK (skipped=38)
+OK (skipped=116)
 ```
 
 34 skipped tests belong to the Wood Database extractor. Its pages are under "all rights
 reserved", so they are not in this repository; the ZIP submitted on the course wiki contains
-them. The other 4 run the Spark jobs end to end and need PySpark and a Java that Spark supports
+them. 4 run the Spark jobs end to end and need PySpark and a Java that Spark supports
 (`JAVA_HOME`, see section 8); inside the course Docker image they run as well:
-`./spark_docker.sh unittest tests.test_sparkjobs_sites`. One test file with the name of every test:
+`./spark_docker.sh unittest tests.test_sparkjobs_sites`. The other 78 need PyLucene and run in
+its Docker image (section 9):
+`./lucene_docker.sh unittest tests.test_lucene_index tests.test_lucene_compare tests.test_lucene_web`.
+One test file with the name of every test:
 
 ```
 python -m unittest tests.test_pfaf_extractor -v
@@ -76,6 +81,12 @@ python -m unittest tests.test_pfaf_extractor -v
 | `test_sparkjobs_wiki.py` | 25 | page selection (records read twice at a split boundary, redirect targets) and join rules of the Wikipedia jobs |
 | `test_sparkjobs_session.py` | 3 | local and HDFS paths, an old output folder is replaced only when it holds Spark output |
 | `test_sparkjobs_sites.py` | 17 | Spark extraction and merge; 4 end-to-end tests compare them with the single-process output |
+| `test_command_line.py` | 8 | commands without their input data end with one line that names the missing input |
+| `test_lucene_documents.py` | 52 | one document per plant: merging the records, IUCN and authority priority, ranges, Wikipedia match levels and redirects, plant type, leaf and origin rules, placeholders, categories |
+| `test_lucene_querycheck.py` | 21 | checks of the query text without Java: unknown and stored-only fields, numbers, operators not in capitals, reversed ranges, plain words |
+| `test_lucene_index.py` | 37 | PyLucene on a small index: Boolean, phrase, fuzzy, wildcard, ranges with open ends, exact fields, boosts, stop words, both similarities, the exact-name boost, query errors, a failed rebuild, missing input |
+| `test_lucene_compare.py` | 27 | old vs. new index: overlap, timing, the report, one run on two small indexes (9 need PyLucene) |
+| `test_lucene_web.py` | 32 | the search page: examples, query errors, notices, matched values, links, HTML escaping, input limits, wildcards with many stars, parallel requests |
 
 ## 4. Download the index
 
@@ -167,7 +178,7 @@ terminal, and an interrupted crawl continues where it stopped.
 | crawl | `python -m crawler.crawl --site ncsu` (also `pfaf`, `tso`, `wooddb`) | `data/raw/<site>/`, `data/state/<site>/crawl_log.tsv`, `discovered.tsv` |
 | extract | `python -m extractor.run --site all` | `data/extracted/<site>_plants.jsonl` and `.tsv` |
 | merge | `python -m tools.merge_entities` | `data/extracted/entities.jsonl`, `entities_stats.md` |
-| index | `python -m indexer.build` (about 6 s) | `data/index/` |
+| index | `python -m indexer.build` (about 5 s) | `data/index/` |
 | statistics | `python -m tools.all_stats --tokens` | `data/stats/<site>.txt` |
 | field coverage | `python -m tools.coverage` | `data/stats/coverage.md` |
 
@@ -210,7 +221,53 @@ curl -L -C - -o data/wikipedia/enwiki-20261001-pages-articles.xml.bz2 https://du
 The same jobs run without Docker on Spark 4: `pip install pyspark`, set `JAVA_HOME` to
 Java 17 or 21, and call them as `python -m sparkjobs.wiki_pages` and so on.
 
-## 9. Troubleshooting
+## 9. PyLucene index
+
+The second index runs in the PyLucene Docker image `coady/pylucene` (Lucene 10, Java 21; there
+is an arm64 build, so it runs natively on Apple Silicon). The unit tests run in a fresh clone
+(117 tests; one test of `test_lucene_compare` is for a machine without PyLucene and is skipped
+here):
+
+```
+docker pull coady/pylucene
+./lucene_docker.sh unittest tests.test_lucene_index tests.test_lucene_querycheck tests.test_lucene_compare tests.test_lucene_web
+```
+
+Building the index needs the output of section 8 (`data/spark/joined/entities/`,
+`data/spark/extracted/`), and so the crawl and the dump. Without it `lucene_index.build` stops
+with a message that names the missing folder, and the search, the comparison and the page
+command stop with a message that says which index is missing:
+
+```
+./lucene_docker.sh lucene_index.build                 # -> data/lucene/index/, data/lucene/stats.json
+./lucene_docker.sh lucene_index.search "quercus NOT robur"
+./lucene_docker.sh lucene_index.search "authority:L AND year:[1753 TO 1753] AND soil:clay AND zone_min:[* TO 5]" --top 5
+./lucene_docker.sh lucene_index.search "year:[1754 TO 1800] AND plant_type:tree" --top 5
+./lucene_docker.sh lucene_index.search "japanese maple" --operator and
+./lucene_docker.sh lucene_index.search "oak" --similarity classic --explain
+./lucene_docker.sh lucene_index.compare               # old vs. new index -> data/lucene/compare.md
+```
+
+The same index has a search page with clickable example queries:
+
+```
+LUCENE_PORT=8080 ./lucene_docker.sh lucene_index.web   # then open http://localhost:8080, stop with Ctrl+C
+```
+
+`lucene_docker.sh` mounts the project folder as `/vinf` and runs the module with the image's
+Python. A word without a field is searched in `name`, `common_name`, `synonym`, `text` and
+`wiki`; a plant property is searched through its field with `field:value` (`soil:clay`,
+`light:shade`, `plant_type:tree`). Numeric fields (`year`, `zone_min`, `zone_max`,
+`height_max_cm`, `density`, `janka`, `edibility`, `medicinal`, `n_sources`) take ranges with
+`[a TO b]`, an open end is `*`. Operators are written in capitals (AND, OR, NOT). The default
+similarity is BM25, `--similarity classic` switches to tf-idf; `--explain` prints how Lucene
+computed the score of each hit. A query that starts with `-` goes after `--`:
+`./lucene_docker.sh lucene_index.search -- "-robur quercus"`. The time printed by the command
+line is that of the first query in a fresh JVM (tens of ms); `lucene_index.compare` measures a
+warm JVM. `lucene_index.compare` also needs the own index of section 4 or 7 in `data/index/`.
+Every run prints a harmless JVM warning about `jdk.incubator.vector`.
+
+## 10. Troubleshooting
 
 | Message | Fix |
 |---|---|
@@ -220,3 +277,7 @@ Java 17 or 21, and call them as `python -m sparkjobs.wiki_pages` and so on.
 | PowerShell refuses to run `Activate.ps1` | call `.venv\Scripts\python -m ...` directly without activating |
 | `Java gateway process exited` or `Module jdk.incubator.vector not found` (Spark without Docker) | `JAVA_HOME` points to a Java that Spark cannot use (for example the runtime bundled with an IDE); point it to a JDK 17 or 21 |
 | `Connection refused` to `localhost:9000` in Docker | a path was read from the image's HDFS; start the job through `spark_docker.sh`, which makes plain paths local files |
+| `no Lucene index in data/lucene/index` | the PyLucene index is not built; it needs the output of section 8, then `./lucene_docker.sh lucene_index.build` |
+| `no Spark output (part-* files) in ...` | `lucene_index.build` did not find the output of the Spark jobs; run section 8 first |
+| `no old index in data/index` | `lucene_index.compare` also needs the own index; repeat step 4 or run `python -m indexer.build` |
+| `unknown field ...` or `... takes whole numbers` | the query names a field that does not exist or gives a number field something else; the fields are listed in the README, section "PyLucene index" |

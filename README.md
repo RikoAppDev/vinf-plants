@@ -6,12 +6,13 @@ Information Retrieval (VINF) at FIIT STU, 2026/27.
 The project crawls plant pages from four botanical websites, extracts plant records with
 regular expressions, merges records of the same plant from different sites and searches them
 with its own inverted index. The extraction and the merge also run on Apache Spark, which joins
-the plants with the English Wikipedia dump. A later part moves the index to PyLucene.
+the plants with the English Wikipedia dump. The joined plants are then indexed in PyLucene,
+which adds field, range, phrase and fuzzy queries.
 
-The crawler, extractors and index use only `requests` and the Python standard library; the
-Spark jobs use PySpark. There is no database, no pandas, no NLTK, no XPath or DOM-based
-extraction (also not for Wikipedia), no crawling framework and no search library. `tiktoken` is
-optional and only used for a token count.
+The crawler, extractors and own index use only `requests` and the Python standard library; the
+Spark jobs use PySpark and the second index PyLucene. There is no database, no pandas, no NLTK,
+no XPath or DOM-based extraction (also not for Wikipedia) and no crawling framework. `tiktoken`
+is optional and only used for a token count.
 
 ## Sources
 
@@ -142,7 +143,7 @@ different pages of the same site are never merged.
   Probabilistic idf and BM25 are not used.
 
 Index of all four sites: 18 125 documents, 116 729 terms, 4.35 M postings, 36 MB, built in
-about 6 s; a query takes a few milliseconds. The built index is attached to the
+about 5 s; a query takes a few milliseconds. The built index is attached to the
 [v1.0 release](https://github.com/RikoAppDev/vinf-plants/releases/tag/v1.0), so search runs
 without a crawl (see [MANUAL.md](MANUAL.md)).
 
@@ -158,7 +159,8 @@ All Spark jobs run with `spark-submit` in the course image `iisas/hadoop-spark-p
   `</page>` as the record delimiter of Hadoop's `TextInputFormat`, so every record is one page;
   bzip2 is splittable, so the file is read in 769 parallel input splits of 32 MB. Hadoop 2.9 in
   the course image reads a record twice when a split ends inside the delimiter (HADOOP-18321);
-  the job counts such a record once and keeps every page once. Each page goes through the regex parser `wikipedia/wikitext.py` (title, redirect,
+  the job counts such a record once and keeps every page once. Each page goes through the regex
+  parser `wikipedia/wikitext.py` (title, redirect,
   taxobox with genus, species, authority, IUCN status and synonyms, categories, common names,
   lead). Of 25.9 M pages (7.2 M articles, 12.1 M redirects, 501 310 articles with a taxobox) it
   keeps 51 091 articles and 4 088 redirects that can belong to our plants, including the plant
@@ -182,14 +184,65 @@ entities joined to such an article, 99.9 % get an authority, 61.5 % the year of 
 31.6 % an IUCN status, 63.0 % synonyms and 83.2 % common names. In the course image the page
 selection takes 13 min, the join 17 s.
 
+## PyLucene index
+
+`lucene_index/` indexes the output of the Spark jobs in PyLucene 10 (Docker image
+`coady/pylucene`, run through `lucene_docker.sh`). One document is one plant: 14 199 documents
+that combine the records of all sites with the joined Wikipedia article. Reading the Spark
+output takes about 2 s and building the index about 5.5 s; the index has 29.3 MB. In a warm JVM
+a query takes up to 1.2 ms (fuzzy 5–9 ms); the first query of a fresh process takes tens of ms.
+
+| Fields | Lucene type | Used for |
+|---|---|---|
+| `name`, `common_name`, `synonym` | TextField, standard analyzer with English stop words, stored | names; searched by default with boosts 0.4 / 0.3 / 0.3 |
+| `text`, `uses`, `wiki` | TextField, English analyzer (stemming) | descriptions, uses and the Wikipedia lead; default fields `text` 0.2, `wiki` 0.1 |
+| `family`, `genus`, `authority`, `plant_type`, `leaf`, `light`, `soil`, `ph`, `moisture`, `tolerates`, `maintenance`, `flower_color`, `attracts`, `landscape`, `origin` | TextField, standard analyzer (`leaf` keeps "semi-evergreen" as one word), stored | filters such as `soil:clay`, `authority:L`, `origin:europe` |
+| `category` | TextField, standard analyzer | Wikipedia categories of the plant: `category:"flora of china"` |
+| `id`, `key`, `source`, `iucn` | StringField | exact values: `source:tso`, `iucn:en` |
+| `year`, `zone_min`, `zone_max`, `height_max_cm`, `density`, `janka`, `edibility`, `medicinal`, `n_sources` | IntPoint + StoredField | ranges: `year:[1754 TO 1800]`, `density:[700 TO *]` |
+| `url`, `wiki_title`, `wiki_url`, `wiki_match` | StoredField | shown with a result |
+
+Queries go through `StandardQueryParser` (with a points config for the numeric fields), so they
+can use AND / OR / NOT, `"phrases"`, fuzzy terms (`quercsu~`), wildcards (`querc*`), ranges and
+boosts. `querycheck.py` checks the text of a query first and reports what Lucene would answer
+with no hits and no reason: an unknown field, a field that is only stored, a value of a numeric
+field that is not a whole number. It adds a note when the operators are in lower case, which
+Lucene reads as ordinary words.
+
+Scoring is `BM25Similarity`, the default of Lucene; `--similarity classic` switches to
+`ClassicSimilarity` (tf-idf). With the length norm of tf-idf the long descriptions count for
+almost nothing, so a one-word query is decided by the short name fields: `oak` ranks
+*Quercus robur* 19th with ClassicSimilarity and first with BM25. When plain words are the whole
+name of a plant, the document with that key gets a boost: with 600 random plant names as queries,
+the plant was first for 84 % of the species and 77 % of the longer names without the boost, and
+for all of them with it.
+
+What a document takes from Wikipedia depends on the joined article: only the lead from a genus
+article; common names, synonyms, categories and the lead from the species article of a cultivar;
+also the IUCN status, authority and year from an article about the plant itself. A redirect often
+leads to the article of another, accepted name (*Alnus rugosa* → *Alnus incana*): its Latin name
+then becomes a synonym, the authority comes from the websites, the year stays empty, and its IUCN
+status and the places of its categories are used only when the websites give none. Another
+spelling of the same name counts as the same name. Besides the command line, `lucene_index.web`
+serves a search page with example queries (MANUAL, section 9).
+
+`lucene_index.compare` runs 21 queries on the old and the new index and times them in a warm JVM
+(median of 30 runs after 100 warm-up rounds, ranking only). The old index has no operators
+(`quercus NOT robur` still ranks *Quercus robur* third), no ranges and no typo tolerance; for
+five of the six questions of the project, which need ranges and filters, it matches
+16 000–17 500 of the 18 125 records, while the structured PyLucene queries return the 1–387
+plants that meet the conditions, in 0.1–0.4 ms against 2–11 ms.
+
 ## Tests
 
 `python -m unittest discover -s tests -t .` runs the unit tests: extractors on saved real
 pages with values checked by hand (`tests/fixtures/`, see its README for sources and licences),
 the crawler with a fake HTTP session, name normalisation, record merging and the indexer,
-including scores computed by hand, the Wikipedia parser on saved dump pages and the Spark jobs.
-There are 434 tests; in a fresh clone 34 Wood Database tests are skipped (the pages are not
-distributed) and 4 Spark end-to-end tests are skipped unless PySpark and Java are available.
+including scores computed by hand, the Wikipedia parser on saved dump pages, the Spark jobs and
+the PyLucene index with its search page.
+There are 611 tests; in a fresh clone 34 Wood Database tests are skipped (the pages are not
+distributed), 4 Spark end-to-end tests are skipped unless PySpark and Java are available and 78
+PyLucene tests run only in the PyLucene Docker image.
 
 ## Layout
 
@@ -202,6 +255,8 @@ distributed) and 4 Spark end-to-end tests are skipped unless PySpark and Java ar
 | `sparkjobs/` | Spark jobs: `extract_sites.py`, `merge_entities.py`, `compare.py`, `wiki_pages.py`, `join_wiki.py`, shared `session.py` |
 | `wikipedia/` | `wikitext.py`, regex parser of one page of the Wikipedia dump |
 | `spark_docker.sh` | runs a Spark job with `spark-submit` in the course Docker image |
+| `lucene_index/` | PyLucene index: `documents.py` (one document per plant), `build.py`, `search.py`, `querycheck.py`, `compare.py`, `web.py` |
+| `lucene_docker.sh` | runs a module in the PyLucene Docker image |
 | `tests/` | unit tests and saved test pages |
 | `docs/` | architecture diagram |
 | `data/` | crawled pages, crawl state, records and index (created by the commands above, not in git) |

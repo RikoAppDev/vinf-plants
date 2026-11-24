@@ -135,7 +135,12 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     started = time.perf_counter()
-    index = Index(os.path.join(args.data_dir, "index"))
+    try:
+        index = Index(os.path.join(args.data_dir, "index"))
+    except FileNotFoundError as error:
+        # The message already says which command builds the index; a traceback would only hide it.
+        print(error, file=sys.stderr)
+        return 2
     loaded = time.perf_counter()
     if args.source and args.source not in index.meta["documents_per_source"]:
         parser.error("unknown source {!r}, indexed: {}".format(

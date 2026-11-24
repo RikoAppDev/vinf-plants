@@ -33,8 +33,14 @@ def main(argv=None):
     parser.add_argument("--data-dir", default="data")
     args = parser.parse_args(argv)
 
+    paths = sorted(glob.glob(os.path.join(args.data_dir, "extracted", "*_plants.jsonl")))
+    if not paths:
+        print("no extracted records in {} (run python -m extractor.run --site all)".format(
+            os.path.join(args.data_dir, "extracted")), file=sys.stderr)
+        return 2
+
     counts, totals, words = {}, Counter(), {}
-    for path in sorted(glob.glob(os.path.join(args.data_dir, "extracted", "*_plants.jsonl"))):
+    for path in paths:
         source = os.path.basename(path)[:-len("_plants.jsonl")]
         counts[source] = Counter()
         lengths = []

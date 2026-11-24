@@ -125,7 +125,11 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     index_dir = os.path.join(args.data_dir, "index")
-    index = Index(index_dir)
+    try:
+        index = Index(index_dir)
+    except FileNotFoundError as error:
+        print(error, file=sys.stderr)
+        return 2
     meta = index.meta
     sources = ", ".join("{} {}".format(source, count) for source, count in meta["documents_per_source"].items())
     intro = ("Index built {}: N={} documents ({}), {} terms; name boost {}x, fold plurals {}. "

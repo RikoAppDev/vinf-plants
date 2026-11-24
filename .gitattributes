@@ -2,3 +2,5 @@
 tests/fixtures/**/*.html -text
 tests/fixtures/*.html -text
 tests/fixtures/**/*.xml -text
+# shell scripts run in Linux containers: CRLF would break them
+*.sh text eol=lf
